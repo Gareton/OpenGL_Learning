@@ -8,11 +8,15 @@ struct Material{
 };
 
 struct Light {
-    vec4 direction_or_position;//look
+    vec4 direction_or_position;
   
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+	
+	float constant;
+	float linear;
+	float quadratic;
 };
 
 in vec3 Normal;
@@ -25,10 +29,14 @@ uniform vec3 viewPos;
 uniform Material material;
 uniform Light light;
 
+float sq(float val);
+
 void main()
 {
-	vec3 ambientLight = vec3(texture(material.diffuse, TexCoords)) * light.ambient;
+	//ambient
+	vec3 ambient = vec3(texture(material.diffuse, TexCoords)).rgb * light.ambient;
 	
+	//diffuse
 	vec3 norm = normalize(Normal);
 	vec3 lightDir; 
 	
@@ -36,20 +44,34 @@ void main()
 		lightDir = normalize(-vec3(light.direction_or_position));
 	else
 		lightDir = normalize(vec3(light.direction_or_position) - fragPos);
-	
+		
 	float diff = max(dot(norm, lightDir), 0.0);
-	vec3 diffuse = diff * vec3(texture(material.diffuse, TexCoords)) * light.diffuse;
+	vec3 diffuse = diff * vec3(texture(material.diffuse, TexCoords)).rgb * light.diffuse;
 	
-	vec3 viewDir = normalize(-fragPos);
+	//specular
+	vec3 viewDir = normalize(viewPos - fragPos);
 	vec3 reflectDir = reflect(-lightDir, norm);
 	
 	float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-	vec3 specular = vec3(texture(material.specular, TexCoords)) * spec * light.specular;
+	vec3 specular = vec3(texture(material.specular, TexCoords)).rgb * spec * light.specular;
 
-	vec3 emission = vec3(0.0, 0.0, 0.0);
+	//attenuation
+	float dist = length(vec3(light.direction_or_position) - fragPos);
+	float attenuation = 1.0;
 	
-	if(vec3(texture(material.specular, TexCoords)) == vec3(0.0, 0.0, 0.0))
-		emission = vec3(texture(material.emission, TexCoords));
+	if(light.direction_or_position.w != 0.0)
+		attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * sq(dist));
 	
-    FragColor = vec4((ambientLight + diffuse + specular), 1.0);
+	ambient  *= attenuation; 
+	diffuse  *= attenuation;
+	specular *= attenuation; 	
+	
+    FragColor = vec4((ambient + diffuse + specular), 1.0);
 }
+
+float sq(float val)
+{
+	return val * val;
+}
+
+

@@ -46,7 +46,7 @@ unsigned int VBO, VAO, lightVAO, lightVBO, lampVAO;
 clock_t last_fps_tacts;
 GLuint fps;
 GLuint frames;
-glm::vec3 lightPos(18.0f, 3.0f, 19.0f);
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 float cur_attitude = 0.2;
 
@@ -110,7 +110,8 @@ void draw()
 	view = myCamera.getViewMat();
 	projection = glm::perspective(glm::radians(myCamera.getFov()), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
 
-	glm::vec3 final_lightPos = lightPos + glm::vec3(sin(glfwGetTime()) * 10.0f, 0.0f, cos(glfwGetTime()) * 10.0f);
+	const float radius = 0.0f;
+	glm::vec3 final_lightPos = lightPos + glm::vec3(sin(glfwGetTime()) * radius, 0.0f, cos(glfwGetTime()) * radius);
 	
 	model = glm::mat4(1.0f);
 	model = glm::translate(model, final_lightPos);
@@ -126,7 +127,7 @@ void draw()
 	lightShader->use();
 	lightShader->setUniformMat4("view", view);
 	lightShader->setUniformMat4("projection", projection);
-	lightShader->setUniformVec4("light.direction_or_position", glm::vec4(-0.2f, -1.0f, -0.3f, 0.0f));
+	lightShader->setUniformVec4("light.direction_or_position", glm::vec4(final_lightPos, 1.0f));
 	lightShader->setUniformVec3("viewPos", myCamera.getPos());
 	container2_tex->activateTexture();
 	container2_specular_tex->activateTexture();
@@ -232,11 +233,6 @@ int main()
 	glEnableVertexAttribArray(0);
 	//light shader uniforms
 
-	lightShader->use();
-	lightShader->setUniformValue("material.shininess", 32.0f);
-	lightShader->setUniformVec3("light.ambient", glm::vec3(0.2f));
-	lightShader->setUniformVec3("light.diffuse", glm::vec3(0.5f));
-	lightShader->setUniformVec3("light.specular", glm::vec3(1.0f));
 
 	const GLchar *t_path1 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container.jpg";
 	const GLchar *t_path2 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\awesomeface.png";
@@ -258,6 +254,13 @@ int main()
 	lightShader->setUniformValue("material.diffuse", 0);
 	lightShader->setUniformValue("material.specular", 1);
 	lightShader->setUniformValue("material.emission", 2);
+	lightShader->setUniformValue("material.shininess", 32.0f);
+	lightShader->setUniformValue("light.constant", 1.0f);
+	lightShader->setUniformValue("light.linear", 0.09f);
+	lightShader->setUniformValue("light.quadratic", 0.032f);
+	lightShader->setUniformVec3("light.ambient", glm::vec3(0.2f));
+	lightShader->setUniformVec3("light.diffuse", glm::vec3(0.5f));
+	lightShader->setUniformVec3("light.specular", glm::vec3(1.0f));
 
 	model = glm::mat4(1.0f);
 	view = glm::mat4(1.0f);
@@ -272,7 +275,7 @@ int main()
 	{
 		processInput(window);
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		calc_fps();
