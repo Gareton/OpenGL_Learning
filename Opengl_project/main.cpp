@@ -54,6 +54,21 @@ float delta_time = 0.0f;
 float last_frame = 0.0f;
 float current_frame = 0.0f;
 
+bool cursor_disabled = true;
+
+glm::vec3 cubePositions[] = {
+	glm::vec3(0.0f,  0.0f,  0.0f),
+	glm::vec3(2.0f,  5.0f, -15.0f),
+	glm::vec3(-1.5f, -2.2f, -2.5f),
+	glm::vec3(-3.8f, -2.0f, -12.3f),
+	glm::vec3(2.4f, -0.4f, -3.5f),
+	glm::vec3(-1.7f,  3.0f, -7.5f),
+	glm::vec3(1.3f, -2.0f, -2.5f),
+	glm::vec3(1.5f,  2.0f, -2.5f),
+	glm::vec3(1.5f,  0.2f, -1.5f),
+	glm::vec3(-1.3f,  1.0f, -1.5f)
+};
+
 bool init()
 {
 	glfwInit();
@@ -92,42 +107,8 @@ bool init()
 
 void draw()
 {
-	tex1->activateTexture();
-	tex2->activateTexture();
-
-	model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
-
 	view = myCamera.getViewMat();
 	projection = glm::perspective(glm::radians(myCamera.getFov()), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
-
-	ourShader->use();
-	ourShader->setUniformMat4("model", model);
-	ourShader->setUniformMat4("view", view);
-	ourShader->setUniformMat4("projection", projection);
-	ourShader->setUniformValue("attitude", cur_attitude);
-
-	glBindVertexArray(VAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(2.0f, 1.0f, 1.0f));
-	model = glm::rotate(model, glm::radians(100.0f), glm::vec3(0.7f, 1.0f, 0.3f));
-	ourShader->setUniformMat4("model", model);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-
-	for (int k = 0; k < 5; ++k)
-	{
-		for (int j = 0; j < 50; ++j)
-		{
-			for (int i = 0; i < 50; ++i)
-			{
-				model = glm::mat4(1.0f);
-				model = glm::translate(model, glm::vec3(1.0f * (float)j, -5.0f + ((float)-k * 1.0), 1.0f * (float)i));
-				ourShader->setUniformMat4("model", model);
-				glDrawArrays(GL_TRIANGLES, 0, 36);
-			}
-		}
-	}
 
 	glm::vec3 final_lightPos = lightPos + glm::vec3(sin(glfwGetTime()) * 10.0f, 0.0f, cos(glfwGetTime()) * 10.0f);
 	
@@ -142,21 +123,28 @@ void draw()
 	glBindVertexArray(lampVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(16.0f, 1.0f, 20.0f));
-	//model = glm::scale(model, glm::vec3(30.0f, 1.0f, 30.0f));
-
 	lightShader->use();
-	lightShader->setUniformMat4("model", model);
 	lightShader->setUniformMat4("view", view);
 	lightShader->setUniformMat4("projection", projection);
-	lightShader->setUniformVec3("light.position", glm::vec3(view * glm::vec4(final_lightPos, 1.0)));
+	lightShader->setUniformVec4("light.direction_or_position", glm::vec4(-0.2f, -1.0f, -0.3f, 0.0f));
 	lightShader->setUniformVec3("viewPos", myCamera.getPos());
 	container2_tex->activateTexture();
 	container2_specular_tex->activateTexture();
 	container2_emission_map->activateTexture();
 	glBindVertexArray(lightVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	for (int i = 0; i < 10; ++i)
+	{
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, cubePositions[i]);
+
+		float angle = 20.0f * i;
+
+		model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+
+		lightShader->setUniformMat4("model", model);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+	}
 }
 
 void draw_inf()
@@ -198,7 +186,7 @@ int main()
 	std::vector<float> vertices;
 
 	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\verticies.txt", vertices);
-
+	
 	//cube
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -245,11 +233,9 @@ int main()
 	//light shader uniforms
 
 	lightShader->use();
-	lightShader->setUniformVec3("lightColor", glm::vec3(0.5f));
-	lightShader->setUniformVec3("material.specular", glm::vec3(0.50196078f));
 	lightShader->setUniformValue("material.shininess", 32.0f);
-	lightShader->setUniformVec3("light.ambient", glm::vec3(1.0f));
-	lightShader->setUniformVec3("light.diffuse", glm::vec3(1.0f));
+	lightShader->setUniformVec3("light.ambient", glm::vec3(0.2f));
+	lightShader->setUniformVec3("light.diffuse", glm::vec3(0.5f));
 	lightShader->setUniformVec3("light.specular", glm::vec3(1.0f));
 
 	const GLchar *t_path1 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container.jpg";
@@ -390,6 +376,17 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 		myCamera.addY(-delta_time);
 
+	if(glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS)
+		if (cursor_disabled)
+		{
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			cursor_disabled = false;
+		}
+		else
+		{
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			cursor_disabled = true;
+		}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
