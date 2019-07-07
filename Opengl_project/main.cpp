@@ -46,7 +46,7 @@ unsigned int VBO, VAO, lightVAO, lightVBO, lampVAO;
 clock_t last_fps_tacts;
 GLuint fps;
 GLuint frames;
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(1.2f, 0.2f, 2.0f);
 
 float cur_attitude = 0.2;
 
@@ -55,6 +55,8 @@ float last_frame = 0.0f;
 float current_frame = 0.0f;
 
 bool cursor_disabled = true;
+
+const size_t lamps_cnt = 4;
 
 glm::vec3 cubePositions[] = {
 	glm::vec3(0.0f,  0.0f,  0.0f),
@@ -67,6 +69,13 @@ glm::vec3 cubePositions[] = {
 	glm::vec3(1.5f,  2.0f, -2.5f),
 	glm::vec3(1.5f,  0.2f, -1.5f),
 	glm::vec3(-1.3f,  1.0f, -1.5f)
+};
+
+glm::vec3 PointLightsPositions[lamps_cnt] = {
+	glm::vec3(0.7f,  0.2f,  2.0f),
+	glm::vec3(2.3f, -3.3f, -4.0f),
+	glm::vec3(-4.0f,  2.0f, -12.0f),
+	glm::vec3(0.0f,  0.0f, -3.0f)
 };
 
 bool init()
@@ -105,30 +114,43 @@ bool init()
 	return true;
 }
 
+void drawLamp(const glm::vec3 &pos)
+{
+	model = glm::mat4(1.0f);
+	model = glm::translate(model, pos);
+	model = glm::scale(model, glm::vec3(0.2f));
+
+	lampShader->setUniformMat4("model", model);
+	glBindVertexArray(lampVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+
 void draw()
 {
 	view = myCamera.getViewMat();
 	projection = glm::perspective(glm::radians(myCamera.getFov()), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
 
-	const float radius = 0.0f;
-	glm::vec3 final_lightPos = lightPos + glm::vec3(sin(glfwGetTime()) * radius, 0.0f, cos(glfwGetTime()) * radius);
-	
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, final_lightPos);
-	model = glm::scale(model, glm::vec3(0.2f));
-
 	lampShader->use();
-	lampShader->setUniformMat4("model", model);
 	lampShader->setUniformMat4("view", view);
 	lampShader->setUniformMat4("projection", projection);
-	glBindVertexArray(lampVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	for (int i = 0; i < lamps_cnt; ++i)
+		drawLamp(PointLightsPositions[i]);
 
 	lightShader->use();
 	lightShader->setUniformMat4("view", view);
 	lightShader->setUniformMat4("projection", projection);
-	lightShader->setUniformVec4("light.direction_or_position", glm::vec4(final_lightPos, 1.0f));
+	lightShader->setUniformVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
 	lightShader->setUniformVec3("viewPos", myCamera.getPos());
+
+	for (int i = 0; i < lamps_cnt; ++i)
+	{
+		static std::string pref = "pointLights[";
+		std::string nm = std::to_string(i);
+
+		lightShader->setUniformVec3((pref + nm + std::string("].position")).c_str(), PointLightsPositions[i]);
+	}
+
 	container2_tex->activateTexture();
 	container2_specular_tex->activateTexture();
 	container2_emission_map->activateTexture();
@@ -255,12 +277,24 @@ int main()
 	lightShader->setUniformValue("material.specular", 1);
 	lightShader->setUniformValue("material.emission", 2);
 	lightShader->setUniformValue("material.shininess", 32.0f);
-	lightShader->setUniformValue("light.constant", 1.0f);
-	lightShader->setUniformValue("light.linear", 0.09f);
-	lightShader->setUniformValue("light.quadratic", 0.032f);
-	lightShader->setUniformVec3("light.ambient", glm::vec3(0.2f));
-	lightShader->setUniformVec3("light.diffuse", glm::vec3(0.5f));
-	lightShader->setUniformVec3("light.specular", glm::vec3(1.0f));
+	lightShader->setUniformVec3("dirLight.ambient", glm::vec3(0.2f));
+	lightShader->setUniformVec3("dirLight.diffuse", glm::vec3(0.5f));
+	lightShader->setUniformVec3("dirLight.specular", glm::vec3(1.0f));
+
+
+	for (int i = 0; i < lamps_cnt; ++i)
+	{
+		static std::string pref = "pointLights[";
+		std::string nm = std::to_string(i);
+
+		lightShader->setUniformVec3((pref + nm + std::string("].ambient")).c_str(), glm::vec3(0.2f));
+		lightShader->setUniformVec3((pref + nm + std::string("].diffuse")).c_str(), glm::vec3(0.5f));
+		lightShader->setUniformVec3((pref + nm + std::string("].specular")).c_str(), glm::vec3(1.0f));
+
+		lightShader->setUniformValue((pref + nm + std::string("].constant")).c_str(), 1.0f);
+		lightShader->setUniformValue((pref + nm + std::string("].linear")).c_str(), 0.09f);
+		lightShader->setUniformValue((pref + nm + std::string("].quadratic")).c_str(), 0.032f);
+	}
 
 	model = glm::mat4(1.0f);
 	view = glm::mat4(1.0f);

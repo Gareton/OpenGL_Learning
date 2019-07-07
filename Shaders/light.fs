@@ -1,4 +1,5 @@
 #version 430 core
+#define NR_POINT_LIGHTS 4
 
 struct Material{
     sampler2D diffuse;
@@ -7,8 +8,18 @@ struct Material{
     float shininess;
 };
 
-struct Light {
-    vec4 direction_or_position;
+struct DirLight
+{
+	vec3 direction;
+  
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+struct PointLight
+{
+	vec3 position;
   
     vec3 ambient;
     vec3 diffuse;
@@ -27,46 +38,64 @@ out vec4 FragColor;
   
 uniform vec3 viewPos;
 uniform Material material;
-uniform Light light;
+uniform DirLight dirLight;
+uniform PointLight pointLights[NR_POINT_LIGHTS];
 
 float sq(float val);
+vec3 calcDirLight(DirLight l, vec3 normal, vec3 viewDir);
+vec3 calcPointLight(PointLight l, vec3 normal, vec3 viewDir, vec3 fragPos);
 
 void main()
-{
-	//ambient
-	vec3 ambient = vec3(texture(material.diffuse, TexCoords)).rgb * light.ambient;
-	
-	//diffuse
+{	
 	vec3 norm = normalize(Normal);
-	vec3 lightDir; 
-	
-	if(light.direction_or_position.w == 0.0)
-		lightDir = normalize(-vec3(light.direction_or_position));
-	else
-		lightDir = normalize(vec3(light.direction_or_position) - fragPos);
-		
-	float diff = max(dot(norm, lightDir), 0.0);
-	vec3 diffuse = diff * vec3(texture(material.diffuse, TexCoords)).rgb * light.diffuse;
-	
-	//specular
 	vec3 viewDir = normalize(viewPos - fragPos);
-	vec3 reflectDir = reflect(-lightDir, norm);
-	
-	float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-	vec3 specular = vec3(texture(material.specular, TexCoords)).rgb * spec * light.specular;
 
-	//attenuation
-	float dist = length(vec3(light.direction_or_position) - fragPos);
-	float attenuation = 1.0;
+	vec3 resColor = vec3(0.0, 0.0, 0.0);
 	
-	if(light.direction_or_position.w != 0.0)
-		attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * sq(dist));
+	resColor += calcDirLight(dirLight, norm, viewDir);
 	
-	ambient  *= attenuation; 
-	diffuse  *= attenuation;
-	specular *= attenuation; 	
+	for(int i = 0; i < NR_POINT_LIGHTS; ++i)
+		resColor += calcPointLight(pointLights[i], norm, viewDir, fragPos);
+
+    FragColor = vec4(resColor, 1.0);
+}
+
+vec3 calcDirLight(DirLight l, vec3 normal, vec3 viewDir)
+{
+	vec3 lightDir = normalize(-l.direction);
+	vec3 reflectDir = reflect(-lightDir, normal);
 	
-    FragColor = vec4((ambient + diffuse + specular), 1.0);
+	float diff = max(dot(normal, lightDir), 0.0);
+	float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+
+
+	vec3 ambient = vec3(texture(material.diffuse, TexCoords)) * l.ambient;	
+	vec3 diffuse = diff * vec3(texture(material.diffuse, TexCoords)) * l.diffuse;
+	vec3 specular = vec3(texture(material.specular, TexCoords)) * spec * l.specular;	
+	
+    return ambient + diffuse + specular;
+}
+
+vec3 calcPointLight(PointLight l, vec3 normal, vec3 viewDir, vec3 fragPos)
+{
+	vec3 lightDir = normalize(l.position - fragPos);
+	vec3 reflectDir = reflect(-lightDir, normal);
+ 
+    float diff = max(dot(normal, lightDir), 0.0);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+
+    float distance = length(l.position - fragPos);
+    float attenuation = 1.0 / (l.constant + l.linear * distance + l.quadratic * (distance * distance));    
+
+    vec3 ambient = l.ambient * vec3(texture(material.diffuse, TexCoords));
+    vec3 diffuse = l.diffuse * diff * vec3(texture(material.diffuse, TexCoords));
+    vec3 specular = l.specular * spec * vec3(texture(material.specular, TexCoords));
+	
+    ambient *= attenuation;
+    diffuse *= attenuation;
+    specular *= attenuation;
+	
+	return (ambient + diffuse + specular);
 }
 
 float sq(float val)
