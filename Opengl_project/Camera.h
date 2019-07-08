@@ -32,6 +32,7 @@ namespace fps_cam
 		float getFov() { return _fov; }
 		void addY(float delta) { _pos.y += SPEED * delta; }
 		glm::vec3 getPos();
+		glm::vec3 getDir() { return _front; }
 	private:
 		glm::vec3 _world_up;
 		glm::vec3 _up;

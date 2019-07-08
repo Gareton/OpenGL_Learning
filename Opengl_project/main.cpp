@@ -141,6 +141,9 @@ void draw()
 	lightShader->setUniformMat4("view", view);
 	lightShader->setUniformMat4("projection", projection);
 	lightShader->setUniformVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
+	lightShader->setUniformVec3("spotLight.position", myCamera.getPos());
+	lightShader->setUniformVec3("spotLight.direction", myCamera.getDir());
+	lightShader->setUniformVec3("spotLight.diffuse", glm::vec3(0.5f));
 	lightShader->setUniformVec3("viewPos", myCamera.getPos());
 
 	for (int i = 0; i < lamps_cnt; ++i)
@@ -280,6 +283,14 @@ int main()
 	lightShader->setUniformVec3("dirLight.ambient", glm::vec3(0.2f));
 	lightShader->setUniformVec3("dirLight.diffuse", glm::vec3(0.5f));
 	lightShader->setUniformVec3("dirLight.specular", glm::vec3(1.0f));
+	lightShader->setUniformVec3("spotLight.ambient", glm::vec3(0.2f));
+	lightShader->setUniformVec3("spotLight.diffuse", glm::vec3(0.5f));
+	lightShader->setUniformVec3("spotLight.specular", glm::vec3(1.0f));
+	lightShader->setUniformValue("spotLight.constant", 1.0f);
+	lightShader->setUniformValue("spotLight.linear", 0.09f);
+	lightShader->setUniformValue("spotLight.quadratic", 0.032f);
+	lightShader->setUniformValue("spotLight.innerCone", glm::cos(glm::radians(12.5f)));
+	lightShader->setUniformValue("spotLight.outerCone", glm::cos(glm::radians(17.5f)));
 
 
 	for (int i = 0; i < lamps_cnt; ++i)
