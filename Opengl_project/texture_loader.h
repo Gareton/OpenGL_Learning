@@ -4,12 +4,13 @@
 #include "stb_image.h"
 #include <iostream>
 
+
 class Texture
 {
 public:
 	Texture(const GLchar *path = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container.jpg",
 		const GLchar *name = "texture1",
-		int color = GL_RGB,
+		int format = GL_RGB,
 		int texture_num = GL_TEXTURE0,
 		int texture_type = GL_TEXTURE_2D);
 
@@ -17,23 +18,24 @@ public:
 	void activateTexture();
 	void set(const GLchar *path = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container.jpg",
 		const GLchar *name = "texture1",
-		int color = GL_RGB,
+		int format = GL_RGB,
 		int texture_num = GL_TEXTURE0,
 		int texture_type = GL_TEXTURE_2D);
-private:
+
 	unsigned int ID;
+private:
 	int _t_type;
 	int _t_num;
 
-	void construct_helper(const GLchar *path, const GLchar *name, int color, int texture_num, int texture_type);
+	void construct_helper(const GLchar *path, const GLchar *name, int format, int texture_num, int texture_type);
 };
 
-void Texture::set(const GLchar *path, const GLchar *name, int color, int texture_num, int texture_type)
+void Texture::set(const GLchar *path, const GLchar *name, int format, int texture_num, int texture_type)
 {
-	construct_helper(path, name, color, texture_num, texture_type);
+	construct_helper(path, name, format, texture_num, texture_type);
 }
 
-void Texture::construct_helper(const GLchar *path, const GLchar *name, int color, int texture_num, int texture_type)
+void Texture::construct_helper(const GLchar *path, const GLchar *name, int format, int texture_num, int texture_type)
 {
 	_t_type = texture_type;
 	_t_num = texture_num;
@@ -47,15 +49,22 @@ void Texture::construct_helper(const GLchar *path, const GLchar *name, int color
 	glTexParameteri(texture_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(texture_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	int width, height, nrChannels;
+	int width, height, nrComponents;
 
 	stbi_set_flip_vertically_on_load(true);
 
-	unsigned char *data = stbi_load(path, &width, &height, &nrChannels, 0);
+	unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+
+	if (nrComponents == 1)
+		format = GL_RED;
+	else if (nrComponents == 3)
+		format = GL_RGB;
+	else if (nrComponents == 4)
+		format = GL_RGBA;
 
 	if (data)
 	{
-		glTexImage2D(texture_type, 0, color, width, height, 0, color, GL_UNSIGNED_BYTE, data);
+		glTexImage2D(texture_type, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(texture_type);
 	}
 	else
@@ -66,9 +75,9 @@ void Texture::construct_helper(const GLchar *path, const GLchar *name, int color
 	stbi_image_free(data);
 }
 
-Texture::Texture(const GLchar *path, const GLchar *name, int color, int texture_num, int texture_type)
+Texture::Texture(const GLchar *path, const GLchar *name, int format, int texture_num, int texture_type)
 {
-	construct_helper(path, name, color, texture_num, texture_type);
+	construct_helper(path, name, format, texture_num, texture_type);
 }
 
 void Texture::setParameter(int option_type, int val)

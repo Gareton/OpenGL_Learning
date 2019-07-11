@@ -11,13 +11,12 @@
 #include "vertex_loader.h"
 #include "Text_render.h"
 #include "Helper.h"
+#include "Model.h"
 
 #include <iostream>
 #include <vector>
 #include <ctime>
 #include <cstdlib>
-
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xPos, double yPos);
@@ -47,6 +46,7 @@ clock_t last_fps_tacts;
 GLuint fps;
 GLuint frames;
 glm::vec3 lightPos(1.2f, 0.2f, 2.0f);
+mdl::Model *nanoSuitModel;
 
 float cur_attitude = 0.2;
 
@@ -72,10 +72,10 @@ glm::vec3 cubePositions[] = {
 };
 
 glm::vec3 PointLightsPositions[lamps_cnt] = {
-	glm::vec3(0.7f,  0.2f,  2.0f),
-	glm::vec3(2.3f, -3.3f, -4.0f),
-	glm::vec3(-4.0f,  2.0f, -12.0f),
-	glm::vec3(0.0f,  0.0f, -3.0f)
+	glm::vec3(-8.0f,  -11.0f,  4.0f),
+	glm::vec3(5.0f,  -11.0f,  4.0f),
+	glm::vec3(5.0f,  -11.0f,  -3.0f),
+	glm::vec3(-8.0f,  -11.0f,  -3.0f)
 };
 
 bool init()
@@ -137,9 +137,14 @@ void draw()
 	for (int i = 0; i < lamps_cnt; ++i)
 		drawLamp(PointLightsPositions[i]);
 
+	model = glm::mat4(1.0f);
+	model = glm::translate(model, glm::vec3(-1.0f, -20.0f, 0.0f));
+	//model = glm::scale(model, glm::vec3(8.0f));
+
 	lightShader->use();
 	lightShader->setUniformMat4("view", view);
 	lightShader->setUniformMat4("projection", projection);
+	lightShader->setUniformMat4("model", model);
 	lightShader->setUniformVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
 	lightShader->setUniformVec3("spotLight.position", myCamera.getPos());
 	lightShader->setUniformVec3("spotLight.direction", myCamera.getDir());
@@ -154,23 +159,7 @@ void draw()
 		lightShader->setUniformVec3((pref + nm + std::string("].position")).c_str(), PointLightsPositions[i]);
 	}
 
-	container2_tex->activateTexture();
-	container2_specular_tex->activateTexture();
-	container2_emission_map->activateTexture();
-	glBindVertexArray(lightVAO);
-
-	for (int i = 0; i < 10; ++i)
-	{
-		model = glm::mat4(1.0f);
-		model = glm::translate(model, cubePositions[i]);
-
-		float angle = 20.0f * i;
-
-		model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
-
-		lightShader->setUniformMat4("model", model);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-	}
+	nanoSuitModel->draw(*lightShader);
 }
 
 void draw_inf()
@@ -208,6 +197,8 @@ int main()
 	textShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.fs");
 	lightShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.fs");
 	lampShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.fs");
+
+	nanoSuitModel = new mdl::Model("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Models\\Nano_suit\\scene.fbx");
 
 	std::vector<float> vertices;
 
@@ -258,27 +249,7 @@ int main()
 	glEnableVertexAttribArray(0);
 	//light shader uniforms
 
-
-	const GLchar *t_path1 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container.jpg";
-	const GLchar *t_path2 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\awesomeface.png";
-	const GLchar *t_path3 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container_with_border.png";
-	const GLchar *t_path4 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\container_with_border_specular.png";
-	const GLchar *t_path5 = "c:\\Users\\fghft\\source\\repos\\Opengl_project\\textures\\matrix_emission_map.jpg";
-
-	tex1 = new Texture(t_path1, "texture1");
-	tex2 = new Texture(t_path2, "texture2", GL_RGBA, GL_TEXTURE1);
-	container2_tex = new Texture(t_path3, "material.diffuse", GL_RGBA, GL_TEXTURE0);
-	container2_specular_tex = new Texture(t_path4, "material.specular", GL_RGBA, GL_TEXTURE1);
-	container2_emission_map = new Texture(t_path5, "material.emission", GL_RGB, GL_TEXTURE2);
-
-	ourShader->use(); 
-	glUniform1i(glGetUniformLocation(ourShader->ID, "texture1"), 0);
-	glUniform1i(glGetUniformLocation(ourShader->ID, "texture2"), 1);
-
 	lightShader->use();
-	lightShader->setUniformValue("material.diffuse", 0);
-	lightShader->setUniformValue("material.specular", 1);
-	lightShader->setUniformValue("material.emission", 2);
 	lightShader->setUniformValue("material.shininess", 32.0f);
 	lightShader->setUniformVec3("dirLight.ambient", glm::vec3(0.2f));
 	lightShader->setUniformVec3("dirLight.diffuse", glm::vec3(0.5f));
@@ -298,13 +269,13 @@ int main()
 		static std::string pref = "pointLights[";
 		std::string nm = std::to_string(i);
 
-		lightShader->setUniformVec3((pref + nm + std::string("].ambient")).c_str(), glm::vec3(0.2f));
-		lightShader->setUniformVec3((pref + nm + std::string("].diffuse")).c_str(), glm::vec3(0.5f));
+		lightShader->setUniformVec3((pref + nm + std::string("].ambient")).c_str(), glm::vec3(0.05f));
+		lightShader->setUniformVec3((pref + nm + std::string("].diffuse")).c_str(), glm::vec3(0.8f));
 		lightShader->setUniformVec3((pref + nm + std::string("].specular")).c_str(), glm::vec3(1.0f));
 
 		lightShader->setUniformValue((pref + nm + std::string("].constant")).c_str(), 1.0f);
-		lightShader->setUniformValue((pref + nm + std::string("].linear")).c_str(), 0.09f);
-		lightShader->setUniformValue((pref + nm + std::string("].quadratic")).c_str(), 0.032f);
+		lightShader->setUniformValue((pref + nm + std::string("].linear")).c_str(), 0.014f);
+		lightShader->setUniformValue((pref + nm + std::string("].quadratic")).c_str(), 0.0007f);
 	}
 
 	model = glm::mat4(1.0f);
