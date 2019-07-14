@@ -22,6 +22,13 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xPos, double yPos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void APIENTRY glDebugOutput(GLenum source,
+							GLenum type,
+							GLuint id,
+							GLenum severity,
+							GLsizei length,
+							const GLchar *message,
+							const void *userParam);
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -41,7 +48,8 @@ Shader *ourShader;
 Shader *textShader;
 Shader *lightShader;
 Shader *lampShader;
-unsigned int VBO, VAO, lightVAO, lightVBO, lampVAO;
+Shader *fbShader;
+unsigned int VBO, VAO, lightVAO, lightVBO, lampVAO, FBO, RBO, CBO, fbVAO, fbVBO;
 clock_t last_fps_tacts;
 GLuint fps;
 GLuint frames;
@@ -84,6 +92,7 @@ bool init()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 
 	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
 
@@ -108,6 +117,17 @@ bool init()
 
 	glEnable(GL_DEPTH_TEST);
 
+	GLint flags = 0;
+	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+
+	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+	{
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback(glDebugOutput, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+	}
+
 	tsp::init("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Fonts\\ariali.ttf", 48, SCR_WIDTH, SCR_HEIGHT);
 
 
@@ -125,7 +145,7 @@ void drawLamp(const glm::vec3 &pos)
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
-void draw()
+void drawScene()
 {
 	view = myCamera.getViewMat();
 	projection = glm::perspective(glm::radians(myCamera.getFov()), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
@@ -139,7 +159,7 @@ void draw()
 
 	model = glm::mat4(1.0f);
 	model = glm::translate(model, glm::vec3(-1.0f, -20.0f, 0.0f));
-	//model = glm::scale(model, glm::vec3(8.0f));
+	model = glm::scale(model, glm::vec3(4.0f));
 
 	lightShader->use();
 	lightShader->setUniformMat4("view", view);
@@ -160,6 +180,29 @@ void draw()
 	}
 
 	nanoSuitModel->draw(*lightShader);
+}
+
+void draw_inf();
+
+void draw()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	drawScene();
+	draw_inf();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	fbShader->use();
+	glBindVertexArray(fbVAO);
+	glDisable(GL_DEPTH_TEST);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, CBO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void draw_inf()
@@ -197,12 +240,16 @@ int main()
 	textShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.fs");
 	lightShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.fs");
 	lampShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.fs");
+	fbShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\frameBuffer.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\frameBuffer.fs");
 
-	nanoSuitModel = new mdl::Model("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Models\\Nano_suit\\scene.fbx");
+	nanoSuitModel = new mdl::Model("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Models\\glados\\GLaDOS.fbx");
 
 	std::vector<float> vertices;
+	std::vector<float> fbVertices;
 
 	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\verticies.txt", vertices);
+	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\fbVertices.txt", fbVertices);
+
 	
 	//cube
 	glGenVertexArrays(1, &VAO);
@@ -221,6 +268,56 @@ int main()
 
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
+
+	//frame bufffer
+
+	glGenFramebuffers(1, &FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+	glGenTextures(1, &CBO);
+	glBindTexture(GL_TEXTURE_2D, CBO);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, CBO, 0);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenRenderbuffers(1, &RBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 800, 600);
+
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+		return -1;
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glGenVertexArrays(1, &fbVAO);
+	glGenBuffers(1, &fbVBO);
+
+	glBindVertexArray(fbVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, fbVBO);
+	glBufferData(GL_ARRAY_BUFFER, fbVertices.size() * sizeof(float), &fbVertices[0], GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+
+	fbShader->use();
+	fbShader->setUniformValue("screenTexture", 0);
 
 	//light
 	std::vector<float> lightVerticies;
@@ -287,6 +384,8 @@ int main()
 	last_frame = glfwGetTime();
 	last_fps_tacts = std::clock();
 
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 	while (!glfwWindowShouldClose(window))
 	{
 		processInput(window);
@@ -296,7 +395,6 @@ int main()
 
 		calc_fps();
 		draw();
-		draw_inf();
 
 		current_frame = glfwGetTime();
 		delta_time = current_frame - last_frame;
@@ -439,5 +537,53 @@ void mouse_callback(GLFWwindow* window, double xPos, double yPos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	myCamera.processMouseScroll(yoffset);
+}
+
+
+void APIENTRY glDebugOutput(GLenum source,
+							GLenum type,
+							GLuint id,
+							GLenum severity,
+							GLsizei length,
+							const GLchar *message,
+							const void *userParam)
+{
+	if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+	std::cout << "---------------" << std::endl;
+	std::cout << "Debug message (" << id << "): " << message << std::endl;
+
+	switch (source)
+	{
+	case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
+	case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
+	case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
+	case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
+	case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
+	case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
+	} std::cout << std::endl;
+
+	switch (type)
+	{
+	case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
+	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
+	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break;
+	case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
+	case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
+	case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
+	case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
+	case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
+	case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
+	} std::cout << std::endl;
+
+	switch (severity)
+	{
+	case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
+	case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
+	case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
+	case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
+	} std::cout << std::endl;
+
+	std::cout << std::endl;
 }
 
