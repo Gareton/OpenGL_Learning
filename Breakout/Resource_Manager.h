@@ -8,17 +8,21 @@
 class ResourceManager
 {
 public:
-	static Shader    &LoadShader(const GLchar *vShaderFile, const GLchar *fShaderFile, const GLchar *gShaderFile, std::string name);
+	static Shader      &LoadShader(const GLchar *vShaderFile, const GLchar *fShaderFile, const GLchar *gShaderFile, std::string name);
 
-	static Shader    &GetShader(std::string name);
+	static Shader      &GetShader(std::string name);
 
-	static Texture2D &LoadTexture(const GLchar *file, std::string name);
+	static Texture2D   &LoadTexture(const GLchar *file, std::string name);
 
-	static Texture2D &GetTexture(std::string name);
+	static Texture2D   &GetTexture(std::string name);
 
-	static void      SetTexturesDir(std::string dir);
+	static void         SetTexturesDir(std::string dir);
 
-	static void      SetShadersDir(std::string dir);
+	static void         SetShadersDir(std::string dir);
+
+	static void		    SetLevelsDir(std::string dir);
+
+	static std::string	GetLevelsDir();
 
 	static void      Clear();
 private:
@@ -32,6 +36,7 @@ private:
 	static std::map<std::string, Texture2D> Textures;
 	static std::string ShadersDir;
 	static std::string TexturesDir;
+	static std::string LevelsDir;
 };
 
 #endif

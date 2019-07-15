@@ -16,6 +16,7 @@ namespace lamon {
 		void Draw(SpriteRenderer &renderer);
 
 		GLboolean IsCompleted();
+
 	private:
 		void init(std::vector<std::vector<GLuint>> tileData, GLuint levelWidth, GLuint levelHeight);
 

@@ -8,6 +8,7 @@ std::map<std::string, Texture2D>    ResourceManager::Textures;
 std::map<std::string, Shader>       ResourceManager::Shaders;
 std::string ResourceManager::ShadersDir;
 std::string ResourceManager::TexturesDir;
+std::string ResourceManager::LevelsDir;
 
 Shader   &ResourceManager::LoadShader(const GLchar *vShaderFile, const GLchar *fShaderFile, const GLchar *gShaderFile, std::string name)
 {
@@ -148,4 +149,14 @@ void ResourceManager::SetTexturesDir(std::string dir)
 void ResourceManager::SetShadersDir(std::string dir)
 {
 	ShadersDir = dir;
+}
+
+void ResourceManager::SetLevelsDir(std::string dir)
+{
+	LevelsDir = dir;
+}
+
+std::string	ResourceManager::GetLevelsDir()
+{
+	return LevelsDir;
 }
