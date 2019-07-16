@@ -2,6 +2,10 @@
 #define PARTICLES_H
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include "Game_Object.h"
 
 struct Particle {
 	glm::vec2 Position, Velocity;
@@ -10,6 +14,29 @@ struct Particle {
 
 	Particle()
 		: Position(0.0f), Velocity(0.0f), Color(1.0f), Life(0.0f) { }
+};
+
+class ParticleGenerator
+{
+public:
+	ParticleGenerator(Shader shader, Texture2D texture, GLuint amount);
+	void Update(GLfloat dt, GameObject &object, GLuint newParticles, glm::vec2 offset = glm::vec2(0.0f, 0.0f));
+	void Draw();
+private:
+
+	std::vector<Particle> particles;
+	GLuint amount;
+
+	Shader shader;
+	Texture2D texture;
+	GLuint VAO;
+	GLuint lastUsedParticle = 0;
+
+	void init();
+
+	GLuint firstUnusedParticle();
+
+	void respawnParticle(Particle &particle, GameObject &object, glm::vec2 offset = glm::vec2(0.0f, 0.0f));
 };
 
 #endif

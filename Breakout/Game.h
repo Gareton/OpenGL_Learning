@@ -6,6 +6,7 @@
 #include <vector>
 #include "Game_Level.h"
 #include "Ball.h"
+#include "Particles.h"
 
 namespace lamon {
 
@@ -55,6 +56,7 @@ namespace lamon {
 		SpriteRenderer  *Renderer;
 		GameObject      *Player;
 		Ball *ball;
+		ParticleGenerator *Particles;
 	};
 
 }

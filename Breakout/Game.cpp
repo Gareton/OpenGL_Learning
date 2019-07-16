@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "Resource_Manager.h"
 #include "Sprite_Renderer.h"
+#include "Particles.h"
 #include <string>
 #include <algorithm>
 #include <glad/glad.h>
@@ -27,11 +28,14 @@ void lamon::Game::Init()
 	ResourceManager::SetLevelsDir("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Levels");
 
 	ResourceManager::LoadShader("spriteShader.vert", "spriteShader.frag", nullptr, "spriteShader");
+	ResourceManager::LoadShader("particleShader.vert", "particleShader.frag", nullptr, "particleShader");
 
 	glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(this->Width), static_cast<GLfloat>(this->Height), 0.0f, -1.0f, 1.0f);
 
 	ResourceManager::GetShader("spriteShader").Use().SetInteger("spriteTexture", 0);
 	ResourceManager::GetShader("spriteShader").SetMatrix4("projection", projection);
+	ResourceManager::GetShader("particleShader").Use().SetInteger("sprite", 0);
+	ResourceManager::GetShader("particleShader").SetMatrix4("projection", projection);
 
 	Renderer = new SpriteRenderer(ResourceManager::GetShader("spriteShader"));
 
@@ -40,6 +44,7 @@ void lamon::Game::Init()
 	ResourceManager::LoadTexture("block_solid.png", "solidBlock");
 	ResourceManager::LoadTexture("background.jpg", "background");
 	ResourceManager::LoadTexture("paddle.png", "paddle");
+	ResourceManager::LoadTexture("particle.png", "particle");
 
 	for (int i = 1; i <= 4; ++i)
 	{
@@ -60,8 +65,9 @@ void lamon::Game::Init()
 	glm::vec2 ballPos = playerPos + glm::vec2(PLAYER_SIZE.x / 2 - BALL_RADIUS, -BALL_RADIUS * 2);
 
 	ball = new Ball(ballPos, BALL_RADIUS, INITIAL_BALL_VELOCITY,  ResourceManager::GetTexture("ball"));
+	Particles = new ParticleGenerator(ResourceManager::GetShader("particleShader"), ResourceManager::GetTexture("particle"), 500);
 
-	Level = 2;
+	Level = 0;
 }
 
 void lamon::Game::ProcessInput(GLfloat dt)
@@ -100,6 +106,7 @@ void lamon::Game::Update(GLfloat dt)
 {
 	ball->Move(dt, Width);
 	DoCollisions();
+	Particles->Update(dt, *ball, 2, glm::vec2(ball->Radius / 2));
 }
 
 void lamon::Game::Render()
@@ -112,6 +119,7 @@ void lamon::Game::Render()
 
 		Levels[Level].Draw(*Renderer);
 		Player->Draw(*Renderer);
+		Particles->Draw();
 		ball->Draw(*Renderer);
 
 		if (Levels[Level].IsCompleted())
