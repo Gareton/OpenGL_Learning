@@ -16,3 +16,7 @@ void GameObject::Draw(lamon::SpriteRenderer &renderer)
 	renderer.DrawSprite(this->Sprite, this->Position, this->Size, this->Rotation, this->Color);
 }
 
+glm::vec2 GameObject::GetSize()
+{
+	return Size;
+}

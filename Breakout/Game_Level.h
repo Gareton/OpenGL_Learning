@@ -17,10 +17,9 @@ namespace lamon {
 
 		GLboolean IsCompleted();
 
+		std::vector<GameObject> Bricks;
 	private:
 		void init(std::vector<std::vector<GLuint>> tileData, GLuint levelWidth, GLuint levelHeight);
-
-		std::vector<GameObject> Bricks;
 	};
 
 }
