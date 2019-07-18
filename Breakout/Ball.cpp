@@ -5,7 +5,7 @@ Ball::Ball()
 	: GameObject(), Radius(12.5f), Stuck(true) { }
 
 Ball::Ball(glm::vec2 pos, GLfloat radius, glm::vec2 velocity, Texture2D sprite)
-	: GameObject(pos, glm::vec2(radius * 2, radius * 2), sprite, glm::vec3(1.0f), velocity), Radius(radius), Stuck(true) { }
+	: GameObject(pos, glm::vec2(radius * 2, radius * 2), sprite, glm::vec3(1.0f), velocity), Radius(radius), Stuck(true), PassThrough(false), Sticky(false) { }
 
 glm::vec2 Ball::Move(GLfloat dt, GLuint window_width)
 {

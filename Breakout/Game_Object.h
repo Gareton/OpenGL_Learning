@@ -18,8 +18,8 @@ public:
 	glm::vec2   Position;
 	glm::vec2   Size;
 	glm::vec2   Velocity;
-protected:
 	glm::vec3   Color;
+protected:
 
 	GLfloat     Rotation;
 

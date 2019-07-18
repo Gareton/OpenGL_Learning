@@ -22,7 +22,11 @@ public:
 
 	static void		    SetLevelsDir(std::string dir);
 
+	static void		    SetSoundsDir(std::string dir);
+
 	static std::string	GetLevelsDir();
+
+	static std::string	GetSoundsDir();
 
 	static void      Clear();
 private:
@@ -37,6 +41,7 @@ private:
 	static std::string ShadersDir;
 	static std::string TexturesDir;
 	static std::string LevelsDir;
+	static std::string SoundsDir;
 };
 
 #endif

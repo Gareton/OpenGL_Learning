@@ -4,9 +4,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
+#include <irrKlang/irrKlang.h>
 #include "Game_Level.h"
 #include "Ball.h"
 #include "Particles.h"
+#include "PostProcessor.h"
+#include "PowerUp.h"
 
 namespace lamon {
 
@@ -44,9 +47,6 @@ namespace lamon {
 
 		void SetState(GameState state);
 		void SetKey(GLuint key, GLboolean state);
-		Collision CheckCollision(Ball &one, GameObject &two);
-		void DoCollisions();
-		Direction VectorDirection(glm::vec2 target);
 	private:
 		GameState              State;
 		GLboolean              Keys[1024];
@@ -57,6 +57,20 @@ namespace lamon {
 		GameObject      *Player;
 		Ball *ball;
 		ParticleGenerator *Particles;
+		PostProcessor *postProc;
+		GLfloat ShakeTime;
+		std::vector<power::PowerUp>  PowerUps;
+		irrklang::ISoundEngine *SoundEngine;
+
+		Collision CheckBallCollision(Ball &one, GameObject &two);
+		bool CheckAABBCollision(GameObject &one, GameObject &two);
+		void DoCollisions();
+		Direction VectorDirection(glm::vec2 target);
+		void SpawnPowerUps(GameObject &block);
+		void UpdatePowerUps(GLfloat dt);
+		void ActivatePowerUp(power::PowerUp &powerUp);
+		GLboolean IsOtherPowerUpActive(std::vector<power::PowerUp> &powerUps, std::string type);
+		
 	};
 
 }

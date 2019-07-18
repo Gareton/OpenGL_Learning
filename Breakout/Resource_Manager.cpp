@@ -9,6 +9,7 @@ std::map<std::string, Shader>       ResourceManager::Shaders;
 std::string ResourceManager::ShadersDir;
 std::string ResourceManager::TexturesDir;
 std::string ResourceManager::LevelsDir;
+std::string ResourceManager::SoundsDir;
 
 Shader   &ResourceManager::LoadShader(const GLchar *vShaderFile, const GLchar *fShaderFile, const GLchar *gShaderFile, std::string name)
 {
@@ -159,4 +160,14 @@ void ResourceManager::SetLevelsDir(std::string dir)
 std::string	ResourceManager::GetLevelsDir()
 {
 	return LevelsDir;
+}
+
+void ResourceManager::SetSoundsDir(std::string dir)
+{
+	SoundsDir = dir;
+}
+
+std::string	ResourceManager::GetSoundsDir()
+{
+	return SoundsDir;
 }

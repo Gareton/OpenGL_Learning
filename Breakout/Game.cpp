@@ -9,11 +9,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <irrKlang/irrKlang.h>
 
 lamon::Game::Game(GLuint width, GLuint height)
 {
 	this->Width = width;
 	this->Height = height;
+	ShakeTime = 0.05f;
 }
 
 lamon::Game::~Game()
@@ -26,9 +28,11 @@ void lamon::Game::Init()
 	ResourceManager::SetTexturesDir("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Textures");
 	ResourceManager::SetShadersDir("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Shaders");
 	ResourceManager::SetLevelsDir("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Levels");
+	ResourceManager::SetSoundsDir("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Sounds");
 
 	ResourceManager::LoadShader("spriteShader.vert", "spriteShader.frag", nullptr, "spriteShader");
 	ResourceManager::LoadShader("particleShader.vert", "particleShader.frag", nullptr, "particleShader");
+	ResourceManager::LoadShader("postProcessing.vert", "postProcessing.frag", nullptr, "postProcessorShader");
 
 	glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(this->Width), static_cast<GLfloat>(this->Height), 0.0f, -1.0f, 1.0f);
 
@@ -45,6 +49,12 @@ void lamon::Game::Init()
 	ResourceManager::LoadTexture("background.jpg", "background");
 	ResourceManager::LoadTexture("paddle.png", "paddle");
 	ResourceManager::LoadTexture("particle.png", "particle");
+	ResourceManager::LoadTexture("powerup_chaos.png", "tex_chaos");
+	ResourceManager::LoadTexture("powerup_confuse.png", "tex_confuse");
+	ResourceManager::LoadTexture("powerup_increase.png", "tex_size");
+	ResourceManager::LoadTexture("powerup_passthrough.png", "tex_pass");
+	ResourceManager::LoadTexture("powerup_sticky.png", "tex_sticky");
+	ResourceManager::LoadTexture("powerup_speed.png", "tex_speed");
 
 	for (int i = 1; i <= 4; ++i)
 	{
@@ -66,6 +76,10 @@ void lamon::Game::Init()
 
 	ball = new Ball(ballPos, BALL_RADIUS, INITIAL_BALL_VELOCITY,  ResourceManager::GetTexture("ball"));
 	Particles = new ParticleGenerator(ResourceManager::GetShader("particleShader"), ResourceManager::GetTexture("particle"), 500);
+	postProc = new PostProcessor(ResourceManager::GetShader("postProcessorShader"), Width, Height);
+
+	SoundEngine = irrklang::createIrrKlangDevice();
+	SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "breakout_music.mp3").c_str(), GL_TRUE);
 
 	Level = 0;
 }
@@ -107,23 +121,43 @@ void lamon::Game::Update(GLfloat dt)
 	ball->Move(dt, Width);
 	DoCollisions();
 	Particles->Update(dt, *ball, 2, glm::vec2(ball->Radius / 2));
+
+	if (ShakeTime > 0.0f)
+	{
+		ShakeTime -= dt;
+		if (ShakeTime <= 0.0f)
+			postProc->Shake = false;
+	}
+
+	UpdatePowerUps(dt);
 }
 
 void lamon::Game::Render()
 {
 	if (this->State == GAME_ACTIVE)
 	{
+		postProc->BeginRender();
+
 		Renderer->DrawSprite(ResourceManager::GetTexture("background"),
 			glm::vec2(0, 0), glm::vec2(this->Width, this->Height), 0.0f
 		);
 
 		Levels[Level].Draw(*Renderer);
 		Player->Draw(*Renderer);
+
+		for (power::PowerUp &powerUp : this->PowerUps)
+			if (!powerUp.Destroyed)
+				powerUp.Draw(*Renderer);
+
 		Particles->Draw();
 		ball->Draw(*Renderer);
 
 		if (Levels[Level].IsCompleted())
 			++Level;
+
+		postProc->EndRender();
+
+		postProc->Render(glfwGetTime());
 	}
 }
 
@@ -137,7 +171,7 @@ void lamon::Game::SetKey(GLuint key, GLboolean state)
 	this->Keys[key] = state;
 }
 
-lamon::Collision lamon::Game::CheckCollision(Ball &one, GameObject &two)
+lamon::Collision lamon::Game::CheckBallCollision(Ball &one, GameObject &two)
 {
 	glm::vec2 ballCenter = one.Position + glm::vec2(one.Radius);
 	glm::vec2 brickCenter = two.Position + two.Size * glm::vec2(0.5f, 0.5f);
@@ -156,58 +190,124 @@ lamon::Collision lamon::Game::CheckCollision(Ball &one, GameObject &two)
 
 void lamon::Game::DoCollisions()
 {
+	GLboolean upCol = false;
+	GLboolean downCol = false;
+	GLboolean rightCol = false;
+	GLboolean leftCol = false;
+
+	Collision coll;
+
 	for (GameObject &brick : Levels[Level].Bricks)
 	{
-		Collision coll;
 
 		if (!brick.Destroyed)
 		{
-			coll = CheckCollision(*ball, brick);
+			coll = CheckBallCollision(*ball, brick);
 
 			if (std::get<0>(coll))
 			{
 				if (!brick.IsSolid)
+				{
 					brick.Destroyed = true;
+					SpawnPowerUps(brick);
+					SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "bleep.mp3").c_str(), GL_FALSE);
+				}
+				else
+				{
+					ShakeTime = 0.05f;
+					postProc->Shake = GL_TRUE;
+					SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "solid.wav").c_str(), GL_FALSE);
+				}
+
 
 				Direction dir = std::get<1>(coll);
 
 				glm::vec2 diff_vector = std::get<2>(coll);
-				if (dir == LEFT || dir == RIGHT)
-				{
-					ball->Velocity.x = -ball->Velocity.x;
 
-					GLfloat penetration = ball->Radius - std::abs(diff_vector.x);
-					if (dir == LEFT)
-						ball->Position.x += penetration;
-					else
-						ball->Position.x -= penetration;
-				}
-				else
+				if (!ball->PassThrough || brick.IsSolid)
 				{
-					ball->Velocity.y = -ball->Velocity.y;
 
-					GLfloat penetration = ball->Radius - std::abs(diff_vector.y);
+					if (!((dir == LEFT && leftCol == GL_TRUE)
+						|| (dir == RIGHT && rightCol == GL_TRUE)
+						|| (dir == UP && upCol == GL_TRUE)
+						|| (dir == DOWN && downCol == GL_TRUE)))
+					{
+
+						if (dir == LEFT || dir == RIGHT)
+						{
+							ball->Velocity.x = -ball->Velocity.x;
+
+							GLfloat penetration = ball->Radius - std::abs(diff_vector.x);
+							if (dir == LEFT)
+								ball->Position.x += penetration;
+							else
+								ball->Position.x -= penetration;
+						}
+						else
+						{
+							ball->Velocity.y = -ball->Velocity.y;
+
+							GLfloat penetration = ball->Radius - std::abs(diff_vector.y);
+							if (dir == UP)
+								ball->Position.y -= penetration;
+							else
+								ball->Position.y += penetration;
+						}
+					}
+
 					if (dir == UP)
-						ball->Position.y -= penetration;
+					{
+						upCol = true;
+					}
+					else if (dir == DOWN)
+					{
+						downCol = true;
+					}
+					else if (dir == RIGHT)
+					{
+						rightCol = true;
+					}
 					else
-						ball->Position.y += penetration;
+					{
+						leftCol = true;
+					}
 				}
 			}
 		}
 
-		coll = CheckCollision(*ball, *Player);
+	}
 
-		if (!ball->Stuck && std::get<0>(coll))
+	coll = CheckBallCollision(*ball, *Player);
+
+	if (!ball->Stuck && std::get<0>(coll))
+	{
+		GLfloat centerBoard = Player->Position.x + Player->Size.x / 2;
+		GLfloat distance = (ball->Position.x + ball->Radius) - centerBoard;
+		GLfloat percentage = distance / (Player->Size.x / 2);
+
+		GLfloat strength = 2.0f;
+		glm::vec2 oldVelocity = ball->Velocity;
+		ball->Velocity.x = INITIAL_BALL_VELOCITY.x * percentage * strength;
+		ball->Velocity.y = -1 * abs(ball->Velocity.y); ;
+		ball->Velocity = glm::normalize(ball->Velocity) * glm::length(oldVelocity);
+		ball->Stuck = ball->Sticky;
+
+		SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "bleep.wav").c_str(), GL_FALSE);
+	}
+
+	for (power::PowerUp &powerUp : this->PowerUps)
+	{
+		if (!powerUp.Destroyed)
 		{
-			GLfloat centerBoard = Player->Position.x + Player->Size.x / 2;
-			GLfloat distance = (ball->Position.x + ball->Radius) - centerBoard;
-			GLfloat percentage = distance / (Player->Size.x / 2);
-
-			GLfloat strength = 2.0f;
-			glm::vec2 oldVelocity = ball->Velocity;
-			ball->Velocity.x = INITIAL_BALL_VELOCITY.x * percentage * strength;
-			ball->Velocity.y = -1 * abs(ball->Velocity.y); ;
-			ball->Velocity = glm::normalize(ball->Velocity) * glm::length(oldVelocity);
+			if (powerUp.Position.y >= this->Height)
+				powerUp.Destroyed = GL_TRUE;
+			if (CheckAABBCollision(*Player, powerUp))
+			{	
+				ActivatePowerUp(powerUp);
+				powerUp.Destroyed = GL_TRUE;
+				powerUp.Activated = GL_TRUE;
+				SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "powerup.wav").c_str(), GL_FALSE);
+			}
 		}
 	}
 }
@@ -232,4 +332,147 @@ lamon::Direction lamon::Game::VectorDirection(glm::vec2 target)
 		}
 	}
 	return (Direction)best_match;
+}
+
+GLboolean ShouldSpawn(GLuint chance)
+{
+	GLuint random = rand() % chance;
+	return random == 0;
+}
+
+void lamon::Game::SpawnPowerUps(GameObject &block)
+{
+	if (ShouldSpawn(75)) 
+		this->PowerUps.push_back(
+			power::PowerUp("speed", glm::vec3(0.5f, 0.5f, 1.0f), 0.0f, block.Position, ResourceManager::GetTexture("tex_speed")
+			));
+
+	if (ShouldSpawn(75))
+		this->PowerUps.push_back(
+			power::PowerUp("sticky", glm::vec3(1.0f, 0.5f, 1.0f), 20.0f, block.Position, ResourceManager::GetTexture("tex_sticky")
+			));
+
+	if (ShouldSpawn(75))
+		this->PowerUps.push_back(
+			power::PowerUp("pass-through", glm::vec3(0.5f, 1.0f, 0.5f), 10.0f, block.Position, ResourceManager::GetTexture("tex_pass")
+			));
+
+	if (ShouldSpawn(75))
+		this->PowerUps.push_back(
+			power::PowerUp("pad-size-increase", glm::vec3(1.0f, 0.6f, 0.4), 0.0f, block.Position, ResourceManager::GetTexture("tex_size")
+			));
+
+	if (ShouldSpawn(15)) 
+		this->PowerUps.push_back(
+			power::PowerUp("confuse", glm::vec3(1.0f, 0.3f, 0.3f), 15.0f, block.Position, ResourceManager::GetTexture("tex_confuse")
+			));
+
+	if (ShouldSpawn(15))
+		this->PowerUps.push_back(
+			power::PowerUp("chaos", glm::vec3(0.9f, 0.25f, 0.25f), 15.0f, block.Position, ResourceManager::GetTexture("tex_chaos")
+			));
+}
+
+void lamon::Game::UpdatePowerUps(GLfloat dt)
+{
+	for (power::PowerUp &powerUp : this->PowerUps)
+	{
+		powerUp.Position += powerUp.Velocity * dt;
+		if (powerUp.Activated)
+		{
+			powerUp.Duration -= dt;
+
+			if (powerUp.Duration <= 0.0f)
+			{
+				powerUp.Activated = GL_FALSE;
+
+				if (powerUp.Type == "sticky")
+				{
+					if (!IsOtherPowerUpActive(this->PowerUps, "sticky"))
+					{	
+						ball->Sticky = GL_FALSE;
+						Player->Color = glm::vec3(1.0f);
+					}
+				}
+				else if (powerUp.Type == "pass-through")
+				{
+					if (!IsOtherPowerUpActive(this->PowerUps, "pass-through"))
+					{	
+						ball->PassThrough = GL_FALSE;
+						ball->Color = glm::vec3(1.0f);
+					}
+				}
+				else if (powerUp.Type == "confuse")
+				{
+					if (!IsOtherPowerUpActive(this->PowerUps, "confuse"))
+					{	
+						postProc->Confuse = GL_FALSE;
+					}
+				}
+				else if (powerUp.Type == "chaos")
+				{
+					if (!IsOtherPowerUpActive(this->PowerUps, "chaos"))
+					{	
+						postProc->Chaos = GL_FALSE;
+					}
+				}
+			}
+		}
+	}
+
+	this->PowerUps.erase(std::remove_if(this->PowerUps.begin(), this->PowerUps.end(),
+		[](const power::PowerUp &powerUp) { return powerUp.Destroyed && !powerUp.Activated; }
+	), this->PowerUps.end());
+}
+
+bool lamon::Game::CheckAABBCollision(GameObject &one, GameObject &two)
+{
+	bool x_col = one.Position.x + one.Size.x >= two.Position.x && two.Position.x + two.Size.x >= one.Position.x;
+	bool y_col = one.Position.y + one.Size.y >= two.Position.y && two.Position.y + two.Size.y >= one.Position.y;
+
+	return x_col && y_col;
+}
+
+void lamon::Game::ActivatePowerUp(power::PowerUp &powerUp)
+{
+	if (powerUp.Type == "speed")
+	{
+		ball->Velocity *= 1.2;
+	}
+	else if (powerUp.Type == "sticky")
+	{
+		ball->Sticky = GL_TRUE;
+		Player->Color = glm::vec3(1.0f, 0.5f, 1.0f);
+	}
+	else if (powerUp.Type == "pass-through")
+	{
+		ball->PassThrough = GL_TRUE;
+		ball->Color = glm::vec3(1.0f, 0.5f, 0.5f);
+	}
+	else if (powerUp.Type == "pad-size-increase")
+	{
+		Player->Size.x += 50;
+	}
+	else if (powerUp.Type == "confuse")
+	{
+		if (!postProc->Chaos)
+			postProc->Confuse = GL_TRUE;
+	}
+	else if (powerUp.Type == "chaos")
+	{
+		if (!postProc->Confuse)
+			postProc->Chaos = GL_TRUE;
+	}
+}
+
+GLboolean lamon::Game::IsOtherPowerUpActive(std::vector<power::PowerUp> &powerUps, std::string type)
+{
+	for (const power::PowerUp &powerUp : powerUps)
+	{
+		if (powerUp.Activated)
+			if (powerUp.Type == type)
+				return GL_TRUE;
+	}
+
+	return GL_FALSE;
 }
