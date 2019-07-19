@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <irrKlang/irrKlang.h>
+#include "TextRenderer.h"
 
 lamon::Game::Game(GLuint width, GLuint height)
 {
@@ -81,6 +82,11 @@ void lamon::Game::Init()
 	SoundEngine = irrklang::createIrrKlangDevice();
 	SoundEngine->play2D((ResourceManager::GetSoundsDir() + "\\" + "breakout_music.mp3").c_str(), GL_TRUE);
 
+	textRenderer = new TextRenderer(Width, Height);
+	textRenderer->Load("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Breakout_data\\Fonts\\OCRAEXT.TTF", 24);
+
+	State = GAME_MENU;
+	Lives = 3;
 	Level = 0;
 }
 
@@ -114,6 +120,42 @@ void lamon::Game::ProcessInput(GLfloat dt)
 		if (this->Keys[GLFW_KEY_SPACE])
 			ball->Stuck = false;
 	}
+
+	if (this->State == GAME_MENU)
+	{
+		if (this->Keys[GLFW_KEY_ENTER] && !KeysProcessed[GLFW_KEY_ENTER])
+		{
+			this->State = GAME_ACTIVE;
+			KeysProcessed[GLFW_KEY_ENTER] = GL_TRUE;
+		}
+
+		if (this->Keys[GLFW_KEY_W] && !KeysProcessed[GLFW_KEY_W])
+		{
+			this->Level = (this->Level + 1) % 4;
+			KeysProcessed[GLFW_KEY_W] = GL_TRUE;
+		}
+
+		if (this->Keys[GLFW_KEY_S] && !KeysProcessed[GLFW_KEY_S])
+		{
+			if (this->Level > 0)
+				--this->Level;
+			else
+				this->Level = 3;
+
+			KeysProcessed[GLFW_KEY_S] = GL_TRUE;
+		}
+	}
+
+	if (this->State == GAME_WIN)
+	{
+		if (this->Keys[GLFW_KEY_ENTER] && !KeysProcessed[GLFW_KEY_ENTER])
+		{
+			ResetLevel(Level);
+			ResetPlayer();
+			State = GAME_MENU;
+			KeysProcessed[GLFW_KEY_ENTER] = GL_TRUE;
+		}
+	}
 }
 
 void lamon::Game::Update(GLfloat dt)
@@ -130,11 +172,31 @@ void lamon::Game::Update(GLfloat dt)
 	}
 
 	UpdatePowerUps(dt);
+
+	if (ball->Position.y >= Height + ball->Radius * 2.0f) 
+	{
+		--Lives;
+
+		if (Lives == 0)
+		{
+			ResetLevel(Level);
+			State = GAME_MENU;
+		}
+		ResetPlayer();
+	}
+
+	if (State == GAME_ACTIVE && Levels[Level].IsCompleted())
+	{
+		ResetLevel(Level);
+		ResetPlayer();
+		postProc->Chaos = GL_TRUE;
+		State = GAME_WIN;
+	}
 }
 
 void lamon::Game::Render()
 {
-	if (this->State == GAME_ACTIVE)
+	if (this->State == GAME_ACTIVE || this->State == GAME_MENU || this->State == GAME_WIN)
 	{
 		postProc->BeginRender();
 
@@ -158,6 +220,23 @@ void lamon::Game::Render()
 		postProc->EndRender();
 
 		postProc->Render(glfwGetTime());
+
+		textRenderer->RenderText("Lives:" + std::to_string(Lives), 10.0f, 10.0f, 1, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	}
+
+	if (this->State == GAME_MENU)
+	{
+		textRenderer->RenderText("Press ENTER to start", 250.0f, Height / 2, 1.0f);
+		textRenderer->RenderText("Press W or S to select level", 245.0f, Height / 2 + 20.0f, 0.75f);
+	}
+
+	if (this->State == GAME_WIN)
+	{
+		textRenderer->RenderText(
+			"You WON!!!", 320.0, Height / 2 - 20.0, 1.0, glm::vec4(0.0, 1.0, 0.0, 1.0) );
+
+		textRenderer->RenderText(
+			"Press ENTER to retry or ESC to quit", 130.0, Height / 2, 1.0, glm::vec4(1.0, 1.0, 0.0, 1.0) );
 	}
 }
 
@@ -186,6 +265,37 @@ lamon::Collision lamon::Game::CheckBallCollision(Ball &one, GameObject &two)
 		return std::make_tuple(GL_TRUE, VectorDirection(difference), difference);
 	else
 		return std::make_tuple(GL_FALSE, UP, glm::vec2(0, 0));
+}
+
+void lamon::Game::ResetLevel(GLuint level)
+{
+	GameLevel temp;
+
+	temp.Load(("level" + std::to_string(level + 1) + ".txt").c_str(), Width, Height * 0.5f);
+
+	Levels[level] = temp;
+	Level = level;
+	Lives = 3;
+}
+
+void lamon::Game::ResetPlayer()
+{
+	glm::vec2 playerPos = glm::vec2(
+		this->Width / 2 - PLAYER_SIZE.x / 2,
+		this->Height - PLAYER_SIZE.y
+	);
+
+	Player = new GameObject(playerPos, PLAYER_SIZE, ResourceManager::GetTexture("paddle"));
+
+	glm::vec2 ballPos = playerPos + glm::vec2(PLAYER_SIZE.x / 2 - BALL_RADIUS, -BALL_RADIUS * 2);
+
+	ball = new Ball(ballPos, BALL_RADIUS, INITIAL_BALL_VELOCITY, ResourceManager::GetTexture("ball"));
+
+	PowerUps.clear();
+
+	postProc->Confuse = GL_FALSE;
+	postProc->Chaos = GL_FALSE;
+	postProc->Shake = GL_FALSE;
 }
 
 void lamon::Game::DoCollisions()

@@ -29,6 +29,11 @@ public:
 	static std::string	GetSoundsDir();
 
 	static void      Clear();
+
+	static std::string ShadersDir;
+	static std::string TexturesDir;
+	static std::string LevelsDir;
+	static std::string SoundsDir;
 private:
 	ResourceManager() { }
 
@@ -38,10 +43,6 @@ private:
 
 	static std::map<std::string, Shader>    Shaders;
 	static std::map<std::string, Texture2D> Textures;
-	static std::string ShadersDir;
-	static std::string TexturesDir;
-	static std::string LevelsDir;
-	static std::string SoundsDir;
 };
 
 #endif

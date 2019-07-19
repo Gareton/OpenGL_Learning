@@ -10,6 +10,7 @@
 #include "Particles.h"
 #include "PostProcessor.h"
 #include "PowerUp.h"
+#include "TextRenderer.h"
 
 namespace lamon {
 
@@ -47,6 +48,8 @@ namespace lamon {
 
 		void SetState(GameState state);
 		void SetKey(GLuint key, GLboolean state);
+
+		GLboolean KeysProcessed[1024];
 	private:
 		GameState              State;
 		GLboolean              Keys[1024];
@@ -61,6 +64,8 @@ namespace lamon {
 		GLfloat ShakeTime;
 		std::vector<power::PowerUp>  PowerUps;
 		irrklang::ISoundEngine *SoundEngine;
+		TextRenderer *textRenderer;
+		GLuint Lives;
 
 		Collision CheckBallCollision(Ball &one, GameObject &two);
 		bool CheckAABBCollision(GameObject &one, GameObject &two);
@@ -70,7 +75,8 @@ namespace lamon {
 		void UpdatePowerUps(GLfloat dt);
 		void ActivatePowerUp(power::PowerUp &powerUp);
 		GLboolean IsOtherPowerUpActive(std::vector<power::PowerUp> &powerUps, std::string type);
-		
+		void ResetLevel(GLuint level);
+		void ResetPlayer();
 	};
 
 }

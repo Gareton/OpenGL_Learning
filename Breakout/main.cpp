@@ -39,7 +39,7 @@ int main()
 	GLfloat deltaTime = 0.0f;
 	GLfloat lastFrame = 0.0f;
 
-	Breakout.SetState(lamon::GameState::GAME_ACTIVE);
+	Breakout.SetState(lamon::GameState::GAME_MENU);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -75,6 +75,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			Breakout.SetKey(key, GL_TRUE);
 		else if (action == GLFW_RELEASE)
 			Breakout.SetKey(key, GL_FALSE);
+
+		if (action == GLFW_PRESS)
+			Breakout.SetKey(key, GL_TRUE);
+		else if (action == GLFW_RELEASE)
+		{
+			Breakout.SetKey(key, GL_FALSE);
+			Breakout.KeysProcessed[key] = GL_FALSE;
+		}
 	}
 }
 
