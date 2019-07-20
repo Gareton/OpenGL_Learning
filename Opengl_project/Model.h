@@ -81,7 +81,7 @@ namespace mdl {
 			v.normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
 			v.texCords = glm::vec2();
 
-			if (mesh->mTextureCoords[0]) 
+			if (mesh->mTextureCoords[0])
 			{
 				v.texCords = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
 			}
@@ -94,7 +94,7 @@ namespace mdl {
 		for (size_t i = 0; i < mesh->mNumFaces; i++)
 		{
 			aiFace face = mesh->mFaces[i];
-			
+
 			for (size_t j = 0; j < face.mNumIndices; ++j)
 				indices.push_back(face.mIndices[j]);
 		}
@@ -147,7 +147,7 @@ namespace mdl {
 		return textures;
 	}
 
-	
+
 
 	unsigned int Model::TextureFromFile(std::string path)
 	{

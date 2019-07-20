@@ -94,11 +94,13 @@ namespace tsp {
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindVertexArray(0);
+		glDisable(GL_BLEND);
 	}
 
 	void render_text(Shader &s, std::string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 	{
 		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);
 
 		s.use();
 		glUniform3f(glGetUniformLocation(s.ID, "textColor"), color.x, color.y, color.z);
@@ -141,6 +143,7 @@ namespace tsp {
 		glBindVertexArray(0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
 	}
 }
 

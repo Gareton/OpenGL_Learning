@@ -30,61 +30,33 @@ void APIENTRY glDebugOutput(GLenum source,
 							const GLchar *message,
 							const void *userParam);
 
+unsigned int loadCubemap(std::vector<std::string> faces, std::string fc_dir);
+unsigned int createCubeVAO(std::string path);
+
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 const float BOOST_MAX = 0.15f;
 
 GLFWwindow* window;
 fps_cam::Camera myCamera;
-Texture *tex1;
-Texture *tex2;
-Texture *container2_tex;
-Texture *container2_specular_tex;
-Texture *container2_emission_map;
 glm::mat4 model;
 glm::mat4 view;
 glm::mat4 projection;
-Shader *ourShader;
 Shader *textShader;
-Shader *lightShader;
-Shader *lampShader;
-Shader *fbShader;
-unsigned int VBO, VAO, lightVAO, lightVBO, lampVAO, FBO, RBO, CBO, fbVAO, fbVBO;
+Shader *modelShader;
+Shader *skyboxShader;
 clock_t last_fps_tacts;
 GLuint fps;
 GLuint frames;
-glm::vec3 lightPos(1.2f, 0.2f, 2.0f);
 mdl::Model *nanoSuitModel;
-
-float cur_attitude = 0.2;
+unsigned int cubeMap;
+unsigned int cubeVAO;
 
 float delta_time = 0.0f;
 float last_frame = 0.0f;
 float current_frame = 0.0f;
 
 bool cursor_disabled = true;
-
-const size_t lamps_cnt = 4;
-
-glm::vec3 cubePositions[] = {
-	glm::vec3(0.0f,  0.0f,  0.0f),
-	glm::vec3(2.0f,  5.0f, -15.0f),
-	glm::vec3(-1.5f, -2.2f, -2.5f),
-	glm::vec3(-3.8f, -2.0f, -12.3f),
-	glm::vec3(2.4f, -0.4f, -3.5f),
-	glm::vec3(-1.7f,  3.0f, -7.5f),
-	glm::vec3(1.3f, -2.0f, -2.5f),
-	glm::vec3(1.5f,  2.0f, -2.5f),
-	glm::vec3(1.5f,  0.2f, -1.5f),
-	glm::vec3(-1.3f,  1.0f, -1.5f)
-};
-
-glm::vec3 PointLightsPositions[lamps_cnt] = {
-	glm::vec3(-8.0f,  -11.0f,  4.0f),
-	glm::vec3(5.0f,  -11.0f,  4.0f),
-	glm::vec3(5.0f,  -11.0f,  -3.0f),
-	glm::vec3(-8.0f,  -11.0f,  -3.0f)
-};
 
 bool init()
 {
@@ -134,75 +106,31 @@ bool init()
 	return true;
 }
 
-void drawLamp(const glm::vec3 &pos)
-{
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, pos);
-	model = glm::scale(model, glm::vec3(0.2f));
-
-	lampShader->setUniformMat4("model", model);
-	glBindVertexArray(lampVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-}
 
 void drawScene()
 {
-	view = myCamera.getViewMat();
-	projection = glm::perspective(glm::radians(myCamera.getFov()), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
-
-	lampShader->use();
-	lampShader->setUniformMat4("view", view);
-	lampShader->setUniformMat4("projection", projection);
-
-	for (int i = 0; i < lamps_cnt; ++i)
-		drawLamp(PointLightsPositions[i]);
-
 	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(-1.0f, -20.0f, 0.0f));
-	model = glm::scale(model, glm::vec3(4.0f));
+	view = myCamera.getViewMat();
+	projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-	lightShader->use();
-	lightShader->setUniformMat4("view", view);
-	lightShader->setUniformMat4("projection", projection);
-	lightShader->setUniformMat4("model", model);
-	lightShader->setUniformVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
-	lightShader->setUniformVec3("spotLight.position", myCamera.getPos());
-	lightShader->setUniformVec3("spotLight.direction", myCamera.getDir());
-	lightShader->setUniformVec3("spotLight.diffuse", glm::vec3(0.5f));
-	lightShader->setUniformVec3("viewPos", myCamera.getPos());
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+	glActiveTexture(GL_TEXTURE1);
+	modelShader->use();
+	modelShader->setUniformMat4("model", model);
+	modelShader->setUniformMat4("view", view);
+	modelShader->setUniformMat4("projection", projection);
+	modelShader->setUniformVec3("camPos", myCamera.getPos());
 
-	for (int i = 0; i < lamps_cnt; ++i)
-	{
-		static std::string pref = "pointLights[";
-		std::string nm = std::to_string(i);
+	nanoSuitModel->draw(*modelShader);
 
-		lightShader->setUniformVec3((pref + nm + std::string("].position")).c_str(), PointLightsPositions[i]);
-	}
-
-	nanoSuitModel->draw(*lightShader);
-}
-
-void draw_inf();
-
-void draw()
-{
-	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-	glEnable(GL_DEPTH_TEST);
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawScene();
-	draw_inf();
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	fbShader->use();
-	glBindVertexArray(fbVAO);
-	glDisable(GL_DEPTH_TEST);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, CBO);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDepthFunc(GL_LEQUAL);
+	skyboxShader->use();
+	skyboxShader->setUniformMat4("projection", projection);
+	skyboxShader->setUniformMat4("view", glm::mat4(glm::mat3(view)));
+	glBindVertexArray(cubeVAO);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glDepthFunc(GL_LESS);
 }
 
 void draw_inf()
@@ -214,9 +142,15 @@ void draw_inf()
 	std::string cords = "x:" + help::itos((int)cPos.x) + " y:" + help::itos((int)cPos.y) + " z:" + help::itos((int)cPos.z);
 
 	tsp::render_text(*textShader, cords, 1.0f, 3.0f, 0.4f, glm::vec3(1.0f, 1.0f, 1.0f));
-
-	//tsp::render_text(*textShader, "+", 290.0f, 390.0f, 1.0f, glm::vec3(0.0f, 1.0f, 0.0f));
 }
+
+void draw()
+{
+	drawScene();
+	draw_inf();
+}
+
+
 
 void calc_fps()
 {
@@ -236,150 +170,30 @@ int main()
 	if (!init())
 		return -1;
 
-	ourShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\triangle.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\triangle1.fs");
+
 	textShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\text.fs");
-	lightShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\light.fs");
-	lampShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\lamp.fs");
-	fbShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\frameBuffer.vs", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\frameBuffer.fs");
+	modelShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\modelShader.vert", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\modelShader.frag");
+	skyboxShader = new Shader("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\skyboxShader.vert", "c:\\Users\\fghft\\source\\repos\\Opengl_project\\Shaders\\skyboxShader.frag");
 
-	nanoSuitModel = new mdl::Model("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Models\\glados\\GLaDOS.fbx");
+	nanoSuitModel = new mdl::Model("c:\\Users\\fghft\\source\\repos\\Opengl_project\\Models\\Nano_suit\\scene.fbx");
 
-	std::vector<float> vertices;
-	std::vector<float> fbVertices;
+	skyboxShader->use();
+	skyboxShader->setUniformValue("cubemap", 1);
 
-	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\verticies.txt", vertices);
-	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\fbVertices.txt", fbVertices);
-
-	
-	//cube
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-
-	//frame bufffer
-
-	glGenFramebuffers(1, &FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-
-	glGenTextures(1, &CBO);
-	glBindTexture(GL_TEXTURE_2D, CBO);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, CBO, 0);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glGenRenderbuffers(1, &RBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 800, 600);
-
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	std::vector<std::string> faces = 
 	{
-		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-		return -1;
-	}
+		"right.jpg",
+		"left.jpg",
+		"top.jpg",
+		"bottom.jpg",
+		"front.jpg",
+		"back.jpg"
+	};
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	std::string fc_dir = "c://Users//fghft//source//repos//Opengl_project//textures//skybox//";
 
-	glGenVertexArrays(1, &fbVAO);
-	glGenBuffers(1, &fbVBO);
-
-	glBindVertexArray(fbVAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, fbVBO);
-	glBufferData(GL_ARRAY_BUFFER, fbVertices.size() * sizeof(float), &fbVertices[0], GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
-
-	fbShader->use();
-	fbShader->setUniformValue("screenTexture", 0);
-
-	//light
-	std::vector<float> lightVerticies;
-
-	load_verticies("c:\\Users\\fghft\\source\\repos\\Opengl_project\\verticies\\light_verticies.txt", lightVerticies);
-
-	glGenVertexArrays(1, &lightVAO);
-	glGenBuffers(1, &lightVBO);
-	glBindVertexArray(lightVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
-	glBufferData(GL_ARRAY_BUFFER, lightVerticies.size() * sizeof(float), &lightVerticies[0], GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-
-	//lamp
-
-	glGenVertexArrays(1, &lampVAO);
-	glBindVertexArray(lampVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
-	glBufferData(GL_ARRAY_BUFFER, lightVerticies.size() * sizeof(float), &lightVerticies[0], GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	//light shader uniforms
-
-	lightShader->use();
-	lightShader->setUniformValue("material.shininess", 32.0f);
-	lightShader->setUniformVec3("dirLight.ambient", glm::vec3(0.2f));
-	lightShader->setUniformVec3("dirLight.diffuse", glm::vec3(0.5f));
-	lightShader->setUniformVec3("dirLight.specular", glm::vec3(1.0f));
-	lightShader->setUniformVec3("spotLight.ambient", glm::vec3(0.2f));
-	lightShader->setUniformVec3("spotLight.diffuse", glm::vec3(0.5f));
-	lightShader->setUniformVec3("spotLight.specular", glm::vec3(1.0f));
-	lightShader->setUniformValue("spotLight.constant", 1.0f);
-	lightShader->setUniformValue("spotLight.linear", 0.09f);
-	lightShader->setUniformValue("spotLight.quadratic", 0.032f);
-	lightShader->setUniformValue("spotLight.innerCone", glm::cos(glm::radians(12.5f)));
-	lightShader->setUniformValue("spotLight.outerCone", glm::cos(glm::radians(17.5f)));
-
-
-	for (int i = 0; i < lamps_cnt; ++i)
-	{
-		static std::string pref = "pointLights[";
-		std::string nm = std::to_string(i);
-
-		lightShader->setUniformVec3((pref + nm + std::string("].ambient")).c_str(), glm::vec3(0.05f));
-		lightShader->setUniformVec3((pref + nm + std::string("].diffuse")).c_str(), glm::vec3(0.8f));
-		lightShader->setUniformVec3((pref + nm + std::string("].specular")).c_str(), glm::vec3(1.0f));
-
-		lightShader->setUniformValue((pref + nm + std::string("].constant")).c_str(), 1.0f);
-		lightShader->setUniformValue((pref + nm + std::string("].linear")).c_str(), 0.014f);
-		lightShader->setUniformValue((pref + nm + std::string("].quadratic")).c_str(), 0.0007f);
-	}
-
-	model = glm::mat4(1.0f);
-	view = glm::mat4(1.0f);
-	projection = glm::mat4(1.0f);
-
-	model = glm::rotate(model, glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+	cubeMap = loadCubemap(faces, fc_dir);
+	cubeVAO = createCubeVAO("c://Users//fghft//source//repos//Opengl_project//verticies//skybox.txt");
 
 	last_frame = glfwGetTime();
 	last_fps_tacts = std::clock();
@@ -406,9 +220,6 @@ int main()
 		++frames;
 	}
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-
 	glfwTerminate();
 	return 0;
 }
@@ -417,18 +228,6 @@ void processInput(GLFWwindow *window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
-
-	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-		if (cur_attitude <= 1.0f - (float)delta_time)
-			cur_attitude += (float)delta_time;
-		else
-			cur_attitude = 1.0f;
-
-	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-		if (cur_attitude >= (float)delta_time)
-			cur_attitude -= (float)delta_time;
-		else
-			cur_attitude = 0.0f;
 
 	static bool boost = false;
 	static int pressed = 0;
@@ -587,3 +386,61 @@ void APIENTRY glDebugOutput(GLenum source,
 	std::cout << std::endl;
 }
 
+
+
+unsigned int loadCubemap(std::vector<std::string> faces, std::string fc_dir)
+{
+	unsigned int textureID;
+
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+	unsigned char *data;
+	int width, height, channels;
+
+	stbi_set_flip_vertically_on_load(false);
+
+	for (int i = 0; i < faces.size(); ++i)
+	{
+		data = stbi_load((fc_dir + faces[i]).c_str(), &width, &height, &channels, 0);
+
+		if (data)
+		{
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		}
+		else
+		{
+			std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+		}
+
+		stbi_image_free(data);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	return textureID;
+}
+
+unsigned int createCubeVAO(std::string path)
+{
+	unsigned int VAO, VBO;
+
+	std::vector<float> data;
+
+	load_verticies(path.c_str(), data);
+
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * data.size(), &data[0], GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	return VAO;
+}
