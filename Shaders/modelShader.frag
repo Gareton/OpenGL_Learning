@@ -12,8 +12,9 @@ uniform samplerCube cubemap;
 
 void main()
 {
+	float ratio = 1.00 / 2.42;
 	vec3 I = normalize(fragPos - camPos);
-	vec3 R = reflect(I, normalize(normal));
+	vec3 R = refract(I, normalize(normal), ratio);
 
 	fragColor = vec4(vec3(texture(cubemap, R)), 1.0);
 }
